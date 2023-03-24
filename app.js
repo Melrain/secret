@@ -1,5 +1,7 @@
 //jshint esversion:6
-require('dotenv').config();
+// require('dotenv').config();
+
+const md5 = require("md5");
 
 const express = require("express");
 
@@ -9,7 +11,7 @@ const bodyParser = require("body-parser");
 
 const mongoose = require("mongoose");
 
-const encrypt = require("mongoose-encryption");
+// const encrypt = require("mongoose-encryption");
 
 async function Main() {
     await mongoose.connect("mongodb+srv://melrain:wszy1989@cluster0.azcsaaz.mongodb.net/secretDB");
@@ -25,7 +27,7 @@ const userSchema = new mongoose.Schema({
     password: String
 });
 
-userSchema.plugin(encrypt, { secret: process.env.secret,encryptedFields: ["password"]});
+// userSchema.plugin(encrypt, { secret: process.env.secret,encryptedFields: ["password"]});
 
 const User = mongoose.model("user", userSchema);
 
@@ -46,10 +48,9 @@ app.route("/register").get((req, res) => {
     res.render("register.ejs");
 }).post((req, res) => {
     const username = req.body.username;
-    const password = req.body.password;
+    const password = md5(req.body.password);
 
     User.findOne({ email: username }).then((result) => {
-        console.log("此处可以解密密码:"+result.password);
         if (username.length > 3 && password.length > 3) {
             if (result === null) {
 
@@ -82,7 +83,31 @@ app.route("/register").get((req, res) => {
 
 app.route("/login").get((req, res) => {
     res.render("login.ejs");
-});
+}).post((req,res)=>{
+    const username = req.body.username;
+    const password = md5(req.body.password);
+
+    User.findOne({email:username}).then((result)=>{
+        if(result === null){
+            console.log("没有该账号，请注册");
+            res.send("没有该账号，请注册");
+        }else{
+            try {
+                if(password === result.password){
+                    console.log("登陆成功");
+                    res.render("secrets.ejs");
+                }else{
+                    console.log("密码错误");
+                    res.send("密码错误");
+                }
+            } catch (error) {
+                console.log(error);
+            }
+        }
+    }).catch((error)=>{
+        console.log(error);
+    })
+})
 
 
 
