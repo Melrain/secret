@@ -1,10 +1,9 @@
 //jshint esversion:6
 // require('dotenv').config();
-const bcrypt = require("bcrypt");
-
-const saltRound = 10;
 
 const express = require("express");
+
+const authRouter = require('./auth');
 
 const app = express();
 
@@ -12,7 +11,12 @@ const bodyParser = require("body-parser");
 
 const mongoose = require("mongoose");
 
-// const encrypt = require("mongoose-encryption");
+const session = require("express-session");
+
+const passport = require("passport");
+
+const passportLocalMongoose = require("passport-local-mongoose");
+
 
 async function Main() {
     await mongoose.connect("mongodb+srv://melrain:wszy1989@cluster0.azcsaaz.mongodb.net/secretDB");
@@ -28,103 +32,116 @@ const userSchema = new mongoose.Schema({
     password: String
 });
 
+userSchema.plugin(passportLocalMongoose);
+
 // userSchema.plugin(encrypt, { secret: process.env.secret,encryptedFields: ["password"]});
 
 const User = mongoose.model("user", userSchema);
+
+app.use(session({
+    secret: "ourLittleSecret",
+    resave: false,
+    saveUninitialized: false
+}));
+
+app.use(passport.initialize());
+
+app.use(passport.session());
+
+passport.serializeUser(User.serializeUser());
+
+passport.deserializeUser(User.deserializeUser());
+
 
 
 app.use(bodyParser.urlencoded({ extended: true }));
 
 app.use(express.static("public"));
 
+app.use('/', authRouter);
+
 app.listen(3000, () => {
     console.log("server is starting at port:3000");
 });
 
+/////////////route/////////////////////////////////
 app.route("/").get((req, res) => {
     res.render("home.ejs");
 });
 
+
+////////////*********register***********//////////////
 app.route("/register").get((req, res) => {
+
     res.render("register.ejs");
+
 }).post((req, res) => {
-    const username = req.body.username;
-    const password = req.body.password
 
-    bcrypt.hash(password, saltRound, ((err, hash) => {
-        User.findOne({ email: username }).then((result) => {
-            if (username.length > 3 && password.length > 3) {
-                if (result === null) {
+    User.register({ username: req.body.username }, req.body.password, function (err, user) {
 
-                    const newUser = new User({
-                        email: username,
-                        password: hash
-                    });
+        if (err) {
 
-                    newUser.save().then(() => {
-                        console.log("注册成功")
-                        res.render("secrets.ejs");
-                    }).catch((error) => {
-                        console.log(error);
-                        res.send(error);
-                    })
+            console.log("Error in registering.", err);
 
-                } else {
-                    console.log("已有账号，请直接登录");
-                    res.send("已有账号，请直接登录");
-                }
-            } else {
-                console.log("账号密码长度不对");
-                res.send("账号密码长度不对");
-            };
-        })
+            res.redirect("/register");
 
-        console.log(err);
-    }))
+        } else {
 
+            passport.authenticate("local")(req, res, function () {
+
+                console.log("user:" + user, 101);
+
+                res.redirect("/secrets");
+
+            });
+
+        }
+    });
 
 });
 
+////////////*********secrets***********//////////////
+app.route("/secrets").get((req, res) => {
+    if (req.isAuthenticated()) {
+        res.render("secrets.ejs");
+    } else {
+        res.redirect("/login");
+    }
+});
 
-app.route("/login").get((req, res) => {
-    res.render("login.ejs");
-}).post((req, res) => {
-    const username = req.body.username;
-    const password = req.body.password;
+////////////*********login***********//////////////
+// app.route("/login").get((req, res) => {
 
-    User.findOne({ email: username }).then((result) => {
-        if (result === null) {
-            console.log("没有该账号，请注册");
-            res.send("没有该账号，请注册");
-        } else {
-            try {
+//     res.render("login.ejs");
 
-                bcrypt.compare(password, result.password, ((err, compareResult) => {
-                    if (compareResult==true) {
-                        console.log("登陆成功");
-                        res.render("secrets.ejs");
-                    } else {
-                        console.log("密码错误");
-                        res.send("密码错误");
-                    }
-                }))
+// }).post((req,res)=>{
+//     const user = new User({
+//         username:req.body.username,
+//         password:req.body.password
+//     });
+
+//     req.login(user,(err)=>{
+//         if(err){
+//             console.log(err);
+//             res.redirect("/register");
+//         }else{
+//             passport.authenticate("local")(req, res, function () {
+                
+//                 res.redirect("/secrets");
+
+//             });
+//         }
+//     })
+// })
 
 
-                // if(password === result.password){
-                //     console.log("登陆成功");
-                //     res.render("secrets.ejs");
-                // }else{
-                //     console.log("密码错误");
-                //     res.send("密码错误");
-                // }
-            } catch (error) {
-                console.log(error);
-            }
-        }
-    }).catch((error) => {
-        console.log(error);
+////////////*********logout***********//////////////
+app.get("/logout", ((req, res) => {
+    req.logout(() => {
+        res.redirect("/");
     });
-})
+
+}));
 
 
 
