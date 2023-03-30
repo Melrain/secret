@@ -117,7 +117,7 @@ app.route("/login").get((req, res) => {
 
     res.render("login.ejs");
 
-}).post((req,res)=>{
+}).post(passport.authenticate("local"),(req,res)=>{
     const user = new User({
         username:req.body.username,
         password:req.body.password
@@ -128,11 +128,7 @@ app.route("/login").get((req, res) => {
             console.log(err);
             res.redirect("/register");
         }else{
-            passport.authenticate("local")(req, res, function () {
-                
                 res.redirect("/secrets");
-
-            });
         }
     })
 })
