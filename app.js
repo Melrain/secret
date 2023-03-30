@@ -3,7 +3,7 @@
 
 const express = require("express");
 
-const authRouter = require('./auth');
+
 
 const app = express();
 
@@ -14,6 +14,8 @@ const mongoose = require("mongoose");
 const session = require("express-session");
 
 const passport = require("passport");
+
+const LocalStrategies = require("passport-local");
 
 const passportLocalMongoose = require("passport-local-mongoose");
 
@@ -48,6 +50,8 @@ app.use(passport.initialize());
 
 app.use(passport.session());
 
+passport.use(new LocalStrategies(User.authenticate()));
+
 passport.serializeUser(User.serializeUser());
 
 passport.deserializeUser(User.deserializeUser());
@@ -58,7 +62,6 @@ app.use(bodyParser.urlencoded({ extended: true }));
 
 app.use(express.static("public"));
 
-app.use('/', authRouter);
 
 app.listen(3000, () => {
     console.log("server is starting at port:3000");
@@ -71,12 +74,12 @@ app.route("/").get((req, res) => {
 
 
 ////////////*********register***********//////////////
-app.route("/register").get((req, res) => {
+app.route("/register",passport.authenticate("local")).get((req, res) => {
 
     res.render("register.ejs");
 
 }).post((req, res) => {
-
+ 
     User.register({ username: req.body.username }, req.body.password, function (err, user) {
 
         if (err) {
@@ -87,13 +90,13 @@ app.route("/register").get((req, res) => {
 
         } else {
 
-            passport.authenticate("local")(req, res, function () {
+
 
                 console.log("user:" + user, 101);
 
                 res.redirect("/secrets");
 
-            });
+
 
         }
     });
@@ -109,30 +112,30 @@ app.route("/secrets").get((req, res) => {
     }
 });
 
-////////////*********login***********//////////////
-// app.route("/login").get((req, res) => {
+//////////*********login***********//////////////
+app.route("/login").get((req, res) => {
 
-//     res.render("login.ejs");
+    res.render("login.ejs");
 
-// }).post((req,res)=>{
-//     const user = new User({
-//         username:req.body.username,
-//         password:req.body.password
-//     });
+}).post((req,res)=>{
+    const user = new User({
+        username:req.body.username,
+        password:req.body.password
+    });
 
-//     req.login(user,(err)=>{
-//         if(err){
-//             console.log(err);
-//             res.redirect("/register");
-//         }else{
-//             passport.authenticate("local")(req, res, function () {
+    req.login(user,(err)=>{
+        if(err){
+            console.log(err);
+            res.redirect("/register");
+        }else{
+            passport.authenticate("local")(req, res, function () {
                 
-//                 res.redirect("/secrets");
+                res.redirect("/secrets");
 
-//             });
-//         }
-//     })
-// })
+            });
+        }
+    })
+})
 
 
 ////////////*********logout***********//////////////
