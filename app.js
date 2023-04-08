@@ -3,8 +3,6 @@
 
 const express = require("express");
 
-
-
 const app = express();
 
 const bodyParser = require("body-parser");
@@ -14,6 +12,12 @@ const mongoose = require("mongoose");
 const session = require("express-session");
 
 const passport = require("passport");
+
+const FacebookStrategy = require("passport-facebook");
+
+require('dotenv').config()
+
+const findOrCreate = require("mongoose-findorcreate");
 
 const LocalStrategies = require("passport-local");
 
@@ -34,6 +38,8 @@ const userSchema = new mongoose.Schema({
     password: String
 });
 
+userSchema.plugin(findOrCreate);
+
 userSchema.plugin(passportLocalMongoose);
 
 // userSchema.plugin(encrypt, { secret: process.env.secret,encryptedFields: ["password"]});
@@ -52,9 +58,13 @@ app.use(passport.session());
 
 passport.use(new LocalStrategies(User.authenticate()));
 
-passport.serializeUser(User.serializeUser());
-
-passport.deserializeUser(User.deserializeUser());
+passport.serializeUser(function(user, done) {
+    done(null, user);
+  });
+  
+  passport.deserializeUser(function(user, done) {
+    done(null, user);
+  });
 
 
 
@@ -66,6 +76,26 @@ app.use(express.static("public"));
 app.listen(3000, () => {
     console.log("server is starting at port:3000");
 });
+
+
+/********facebook strategy ************/
+passport.use(new FacebookStrategy({
+    clientID: process.env.CLIENT_ID,
+    clientSecret: process.env.CLIENT_SECRET,
+    callbackURL: "http://localhost:3000/auth/facebook/callback",
+  },
+  function(accessToken, refreshToken, profile, cb) {
+    User.findOrCreate({ username: profile.id }, function (err, user) {
+      return cb(err, user);
+    });
+  }
+));
+
+app.get("/auth/facebook",passport.authenticate("facebook"));
+
+app.get("/auth/facebook/callback",passport.authenticate("facebook",{failureRedirect:"/login"}),((req,res)=>{
+    res.redirect("/secrets");
+}))
 
 /////////////route/////////////////////////////////
 app.route("/").get((req, res) => {
@@ -90,13 +120,9 @@ app.route("/register",passport.authenticate("local")).get((req, res) => {
 
         } else {
 
-
-
                 console.log("user:" + user, 101);
 
                 res.redirect("/secrets");
-
-
 
         }
     });
